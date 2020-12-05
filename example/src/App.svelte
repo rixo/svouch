@@ -20,7 +20,10 @@
     <input bind:value={input} />
     <button type="submit">Add</button>
 
-    <button disabled={!$dirty} on:click={todos.commitManaged}>Save</button>
+    <button
+      type="button"
+      disabled={!$dirty}
+      on:click={todos.commitManaged}>Save</button>
 
     <span class="status" hidden={!$dirty}>Dirty</span>
     <span class="status" hidden={!$busy}>Busy</span>
