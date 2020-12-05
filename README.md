@@ -1,0 +1,3 @@
+# Svouch
+
+Svelte PouchDB store.
