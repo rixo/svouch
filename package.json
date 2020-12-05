@@ -14,8 +14,13 @@
   "main": "dist/index.js",
   "svelte": "dist/index.js",
   "browser": "dist/index.js",
-  "files": ["dist", "index*.js", "core*.js"],
+  "files": [
+    "dist",
+    "index*.js",
+    "core*.js"
+  ],
   "devDependencies": {
+    "@rixo/eslint-config-svelte": "^0.10.0-alpha.0",
     "@rollup/plugin-commonjs": "^17.0.0",
     "@rollup/plugin-node-resolve": "^11.0.0",
     "objectid": "1",
@@ -24,7 +29,8 @@
     "pouchdb-live-find": "^0.4.0",
     "rollup": "^2.34.1",
     "rollup-plugin-node-builtins": "^2.1.2",
-    "rollup-plugin-node-globals": "^1.4.0"
+    "rollup-plugin-node-globals": "^1.4.0",
+    "svelte": "^3.31.0"
   },
   "scripts": {
     "dev": "rollup -cw",

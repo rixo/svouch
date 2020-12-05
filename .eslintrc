@@ -1,0 +1,12 @@
+extends:
+  - '@rixo/svelte'
+
+overrides:
+  - files: ['**/rollup.config.js', '**/snopack.config.js']
+    env:
+      node: true
+
+# settings:
+#   svelte3/enabled: true
+#   svelte3/ignore-warnings: false
+#   svelte3/lint-template: false
