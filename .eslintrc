@@ -2,7 +2,7 @@ extends:
   - '@rixo/svelte'
 
 overrides:
-  - files: ['**/rollup.config.js', '**/snopack.config.js']
+  - files: ['**/rollup.config.js', '**/snowpack.config.js']
     env:
       node: true
 

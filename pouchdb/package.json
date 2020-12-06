@@ -1,9 +1,8 @@
 {
-  "name": "svouch",
-  "version": "0.0.1-0",
-  "author": "rixo <rixo@rixo.fr>",
-  "license": "ISC",
-  "homepage": "https://github.com/rixo/svouch",
+  "name": "@svouch/pouchdb",
+  "version": "0.0.0",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/rixo/svouch/pouchdb",
   "bugs": {
     "url": "https://github.com/rixo/svouch/issues"
   },
@@ -12,15 +11,7 @@
     "url": "https://github.com/rixo/svouch"
   },
   "main": "dist/index.js",
-  "svelte": "dist/index.js",
-  "browser": "dist/index.js",
-  "files": ["dist", "index.js", "core.js"],
-  "dependencies": {
-    "objectid": "1"
-  },
-  "peerDependencies": {
-    "svelte": "^3"
-  },
+  "files": "dist",
   "devDependencies": {
     "@rollup/plugin-commonjs": "^17.0.0",
     "@rollup/plugin-node-resolve": "^11.0.0",
@@ -29,13 +20,11 @@
     "pouchdb-live-find": "^0.4.0",
     "rollup": "^2.34.1",
     "rollup-plugin-node-builtins": "^2.1.2",
-    "rollup-plugin-node-globals": "^1.4.0",
-    "svelte": "^3.31.0"
+    "rollup-plugin-node-globals": "^1.4.0"
   },
   "scripts": {
     "prepublish": "yarn build",
     "dev": "rollup -cw",
-    "build": "rollup -c",
-    "test": "echo TODO"
+    "build": "rollup -c"
   }
 }
