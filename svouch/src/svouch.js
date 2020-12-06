@@ -1,65 +1,8 @@
-import { writable, readable, derived } from 'svelte/store'
+import { readable } from 'svelte/store'
 import objectid from 'objectid'
 
-import { PouchDB } from './pouch.js'
-
-const identity = (x) => x
-
-const noop = () => {}
-
-const call = (x, f) => f(x)
-
-const pipe = (...fns) => {
-  fns = fns.filter(Boolean)
-  return (x0) => fns.reduce(call, x0)
-}
-
-const minZero = (x) => Math.max(0, x)
-
-const debounce = (fn, delay) => {
-  if (delay === false || delay == null) return fn
-
-  let lastArgs
-  let timeout
-
-  const run = () => fn(...lastArgs)
-
-  return (...args) => {
-    lastArgs = args
-    clearTimeout(timeout)
-    timeout = setTimeout(run, delay)
-  }
-}
-
-const withState = (doc) => {
-  const record = {}
-  Object.defineProperty(record, '$$', {
-    enumerable: false,
-    value: { doc, dirty: false, error: null, epoch: 0 },
-  })
-  return record
-}
-
-const withAccessors = (keys, setDirty) => {
-  const wrap = (record, key) => {
-    Object.defineProperty(record, key, {
-      get() {
-        return record.$$.doc[key]
-      },
-      set(value) {
-        record.$$.doc[key] = value
-        setDirty(record)
-        return true
-      },
-    })
-  }
-  return (record) => {
-    for (const key of keys) {
-      wrap(record, key)
-    }
-    return record
-  }
-}
+import { createSvouchStore } from './store.js'
+import { noop, pipe } from './util.js'
 
 const isBusyRecord = (rec) => rec.$$.saving
 
@@ -77,120 +20,6 @@ const warnPendingBeforeUnload = ({ commitManaged }) => {
   }
 
   window.addEventListener(event, unloadListener)
-}
-
-export const createWritableStore = ({
-  connect,
-  put,
-  setDirty,
-  accessors,
-
-  debounce: debounceDelay = 20,
-
-  selector = {},
-  sort = [{ _id: 'asc' }],
-  limit = 0,
-  skip = 0,
-}) => {
-  const params = {
-    selector,
-    sort,
-    limit,
-    skip,
-  }
-
-  const metaSpec = (field, livefeed, transform = identity) => ({
-    get() {
-      return params[field]
-    },
-    set(value) {
-      const previous = params[field]
-      if (value !== previous) {
-        params[field] = transform(value)
-      }
-      docs.set(livefeed.paginate(params))
-      return true
-    },
-  })
-
-  const docToRecord = pipe(
-    withState,
-    accessors && withAccessors(accessors, setDirty)
-  )
-
-  const withParamsAccessors = (livefeed, docs) => {
-    Object.defineProperties(docs, {
-      sort: metaSpec('sort', livefeed),
-      limit: metaSpec('limit', livefeed, minZero),
-      skip: metaSpec('skip', livefeed, minZero),
-      selector: {
-        get() {
-          return params.selector
-        },
-        set(value) {
-          const field = 'selector'
-          const previous = params[field]
-          if (value !== previous) {
-            params[field] = value
-          }
-          params[field] = value
-          selector$.set(value)
-          return true
-        },
-      },
-    })
-    return docs
-  }
-
-  const selector$ = writable({})
-
-  const liveFeed = derived(selector$, ($selector, set) => {
-    const changes = connect().liveFind({
-      selector: $selector || {},
-      ...params,
-      aggregate: true,
-    })
-    set(changes)
-    return () => {
-      changes.cancel()
-    }
-  })
-
-  const docs = derived(liveFeed, ($feed, set) => {
-    const listener = debounce((event, docs) => set(docs), debounceDelay)
-
-    $feed.on('update', listener)
-
-    docs.set = set
-
-    set([])
-
-    return () => {
-      $feed.removeListener('update', listener)
-    }
-  })
-
-  const records = derived([liveFeed, docs], ([$liveFeed, $docs]) =>
-    withParamsAccessors($liveFeed, $docs.map(docToRecord))
-  )
-
-  const store = derived(
-    records,
-    ($records) => {
-      // apply pre subscribe (e.g. during component init) params
-      store.set = (value) => {
-        if (value !== $records) {
-          Object.assign($records, value)
-        }
-      }
-      return $records
-    },
-    []
-  )
-
-  store.put = put
-
-  return store
 }
 
 const createCollection = (
@@ -298,7 +127,7 @@ const createCollection = (
   // --- API ---
 
   const createWritable = (storeOptions) => {
-    const store = createWritableStore({
+    const store = createSvouchStore({
       connect,
       put,
       setDirty,
@@ -351,20 +180,27 @@ const createCollection = (
   return col
 }
 
-const createDb = ({
-  name: dbName,
-  makeId = objectid,
-  autoConnect = false,
-  autoCommit = 1000,
-  beforeunload = true,
-  logger = console,
-  onError = (...args) => logger.error(...args),
-} = {}) => {
+const createDb = (opts = {}) => {
+  const {
+    // eslint-disable-next-line no-unused-vars
+    name: dbName, // used by createPouch
+
+    PouchDB,
+    createPouch = ({ name }) => new PouchDB(name),
+
+    makeId = objectid,
+    autoConnect = false,
+    autoCommit = 1000,
+    beforeunload = true,
+    logger = console,
+    onError = (...args) => logger.error(...args),
+  } = opts
+
   const collections = {}
 
   let pouch
   let connect = () => {
-    pouch = new PouchDB(dbName)
+    pouch = createPouch(opts)
     connect = () => pouch
     return pouch
   }

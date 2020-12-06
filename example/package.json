@@ -1,6 +1,7 @@
 {
   "scripts": {
     "start": "snowpack dev",
+    "dev": "LINK_SVOUCH=1 snowpack dev",
     "build": "snowpack build",
     "test": "web-test-runner \"src/**/*.test.js\""
   },
@@ -16,6 +17,6 @@
     "chai": "^4.2.0",
     "snowpack": "^2.18.0",
     "superstruct": "^0.12.1",
-    "svouch": "^0.0.1-0"
+    "svouch": "../svouch"
   }
 }

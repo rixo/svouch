@@ -185,6 +185,11 @@
   resolved "https://registry.yarnpkg.com/@snowpack/web-test-runner-plugin/-/web-test-runner-plugin-0.1.5.tgz#239438189785c1f739c42cf711b52b41c48dce21"
   integrity sha512-aeX08rgqR4WYexGtwnY7nZCjbkzIMK9RIvhNVtyg8Xr6VF9HgCOYnTo2rp/y1PWenUba3o2cYAGcl6RuBIXLbw==
 
+"@svouch/pouchdb@^0.0.1-0":
+  version "0.0.1-0"
+  resolved "https://registry.yarnpkg.com/@svouch/pouchdb/-/pouchdb-0.0.1-0.tgz#b8bb73730a897f993ad1911e486c3fc2125dc53e"
+  integrity sha512-DwvOwehrcgfibpZIj00T0l6oe24pmzEKWcA1/NgzHxR/H83JEau1yEP0psIu6g1ijLKGRRFsRvSdya+5oXsc6A==
+
 "@szmarczak/http-timer@^4.0.5":
   version "4.0.5"
   resolved "https://registry.yarnpkg.com/@szmarczak/http-timer/-/http-timer-4.0.5.tgz#bfbd50211e9dfa51ba07da58a14cdfd333205152"
@@ -2348,6 +2353,11 @@ nth-check@~1.0.1:
   dependencies:
     boolbase "~1.0.0"
 
+objectid@1:
+  version "1.1.0"
+  resolved "https://registry.yarnpkg.com/objectid/-/objectid-1.1.0.tgz#bc9e81b08ed538fd67dfd7a4009e15ac4bc6c0c0"
+  integrity sha1-vJ6BsI7VOP1n39ekAJ4VrEvGwMA=
+
 on-finished@^2.3.0:
   version "2.3.0"
   resolved "https://registry.yarnpkg.com/on-finished/-/on-finished-2.3.0.tgz#20f1336481b083cd75337992a16971aa2d906947"
@@ -3089,10 +3099,11 @@ svelte@^3.24.0:
   resolved "https://registry.yarnpkg.com/svelte/-/svelte-3.31.0.tgz#13966e5f55b975bc86675469bb2c58dd0e558d97"
   integrity sha512-r+n8UJkDqoQm1b+3tA3Lh6mHXKpcfOSOuEuIo5gE2W9wQYi64RYX/qE6CZBDDsP/H4M+N426JwY7XGH4xASvGQ==
 
-svouch@^0.0.1-0:
+svouch@../svouch:
   version "0.0.1-0"
-  resolved "https://registry.yarnpkg.com/svouch/-/svouch-0.0.1-0.tgz#84b579c60291675a3a765aafd192e8a6f5fe05d0"
-  integrity sha512-7imBj0QN8JbQk3vEItDqct8aIfFbcJLzXcQo4G1raGW4upZyUxFQO9IXRZFmq3IQWt5hFSJ4hb5ao/ZCsdfDcg==
+  dependencies:
+    "@svouch/pouchdb" "^0.0.1-0"
+    objectid "1"
 
 table-layout@^1.0.1:
   version "1.0.1"
