@@ -12,7 +12,7 @@ PouchDB.plugin(find)
 PouchDB.plugin(liveFind)
 
 const superstructAdapter = {
-  getFields: ({ schema }) => schema,
+  getFields: ({ schema }) => Object.keys(schema),
 }
 
 export const Db = (opts) =>

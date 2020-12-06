@@ -24,7 +24,7 @@ const warnPendingBeforeUnload = ({ commitManaged }) => {
 
 const createCollection = (
   { connect },
-  { name, schema, autoCommit, onError, makeId }
+  { name, schemaAdapter, schema, autoCommit, onError, makeId }
 ) => {
   const prefix = name + '/'
 
@@ -131,7 +131,7 @@ const createCollection = (
       connect,
       put,
       setDirty,
-      accessors: Object.keys(schema.schema),
+      accessors: schemaAdapter.getFields(schema),
       ...storeOptions,
     })
 
@@ -188,6 +188,8 @@ const createDb = (opts = {}) => {
     PouchDB,
     createPouch = ({ name }) => new PouchDB(name),
 
+    schemaAdapter,
+
     makeId = objectid,
     autoConnect = false,
     autoCommit = 1000,
@@ -228,6 +230,7 @@ const createDb = (opts = {}) => {
       onError,
       makeId,
       autoCommit,
+      schemaAdapter,
       ...colOptions,
     })
 
