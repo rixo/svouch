@@ -1,6 +1,6 @@
 {
   "name": "@svouch/pouchdb",
-  "version": "0.0.0",
+  "version": "0.0.1-0",
   "license": "Apache-2.0",
   "homepage": "https://github.com/rixo/svouch/pouchdb",
   "bugs": {
@@ -11,7 +11,7 @@
     "url": "https://github.com/rixo/svouch"
   },
   "main": "dist/index.js",
-  "files": "dist",
+  "files": ["dist"],
   "devDependencies": {
     "@rollup/plugin-commonjs": "^17.0.0",
     "@rollup/plugin-node-resolve": "^11.0.0",
