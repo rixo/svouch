@@ -14,11 +14,7 @@
   "main": "dist/index.js",
   "svelte": "dist/index.js",
   "browser": "dist/index.js",
-  "files": [
-    "dist",
-    "index*.js",
-    "core*.js"
-  ],
+  "files": ["dist", "index*.js", "core*.js"],
   "devDependencies": {
     "@rixo/eslint-config-svelte": "^0.10.0-alpha.0",
     "@rollup/plugin-commonjs": "^17.0.0",
@@ -33,7 +29,9 @@
     "svelte": "^3.31.0"
   },
   "scripts": {
+    "prepublish": "yarn build",
     "dev": "rollup -cw",
+    "build": "rollup -c",
     "test": "echo TODO"
   }
 }
