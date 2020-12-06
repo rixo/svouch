@@ -3,4 +3,4 @@
  * PouchDB or Superstruct), and no default wiring (schema engine).
  */
 
-export { Db } from './src/svouch.js'
+export { Db } from './src/db.js'
