@@ -15,6 +15,7 @@
     "@web/test-runner": "^0.10.0",
     "chai": "^4.2.0",
     "snowpack": "^2.18.0",
-    "superstruct": "^0.12.1"
+    "superstruct": "^0.12.1",
+    "svouch": "^0.0.1-0"
   }
 }

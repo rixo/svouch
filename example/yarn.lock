@@ -3089,6 +3089,11 @@ svelte@^3.24.0:
   resolved "https://registry.yarnpkg.com/svelte/-/svelte-3.31.0.tgz#13966e5f55b975bc86675469bb2c58dd0e558d97"
   integrity sha512-r+n8UJkDqoQm1b+3tA3Lh6mHXKpcfOSOuEuIo5gE2W9wQYi64RYX/qE6CZBDDsP/H4M+N426JwY7XGH4xASvGQ==
 
+svouch@^0.0.1-0:
+  version "0.0.1-0"
+  resolved "https://registry.yarnpkg.com/svouch/-/svouch-0.0.1-0.tgz#84b579c60291675a3a765aafd192e8a6f5fe05d0"
+  integrity sha512-7imBj0QN8JbQk3vEItDqct8aIfFbcJLzXcQo4G1raGW4upZyUxFQO9IXRZFmq3IQWt5hFSJ4hb5ao/ZCsdfDcg==
+
 table-layout@^1.0.1:
   version "1.0.1"
   resolved "https://registry.yarnpkg.com/table-layout/-/table-layout-1.0.1.tgz#8411181ee951278ad0638aea2f779a9ce42894f9"
