@@ -1,3 +1,3 @@
 # Svouch
 
-Svelte PouchDB store.
+No-stress persistent Svelte store with PouchDB.

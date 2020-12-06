@@ -1,7 +1,7 @@
 import { Db } from 'svouch'
 import * as s from 'superstruct'
 
-const db = Db({ name: 'fr.rixo.svouch.example', autoCommit: false })
+const db = Db({ name: 'fr.rixo.svouch.example' })
 
 export const todos = db
   .collection({
