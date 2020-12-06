@@ -1,6 +1,6 @@
 {
   "name": "svouch",
-  "version": "0.0.0",
+  "version": "0.0.1-0",
   "author": "rixo <rixo@rixo.fr>",
   "license": "ISC",
   "homepage": "https://github.com/rixo/svouch",
@@ -14,7 +14,11 @@
   "main": "dist/index.js",
   "svelte": "dist/index.js",
   "browser": "dist/index.js",
-  "files": ["dist", "index*.js", "core*.js"],
+  "files": [
+    "dist",
+    "index*.js",
+    "core*.js"
+  ],
   "devDependencies": {
     "@rixo/eslint-config-svelte": "^0.10.0-alpha.0",
     "@rollup/plugin-commonjs": "^17.0.0",
