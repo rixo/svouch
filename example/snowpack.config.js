@@ -3,7 +3,7 @@ module.exports = {
   mount: {
     public: '/',
     src: '/_dist_',
-    '../dist': '/_svouch_',
+    // '../dist': '/_svouch_',
   },
   plugins: ['@snowpack/plugin-svelte', '@snowpack/plugin-dotenv'],
   install: [
@@ -21,7 +21,7 @@ module.exports = {
   proxy: {
     /* ... */
   },
-  alias: {
-    svouch: '../dist/index.js',
-  },
+  // alias: {
+  //   svouch: '../dist/index.js',
+  // },
 }
