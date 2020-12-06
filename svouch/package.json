@@ -1,0 +1,41 @@
+{
+  "name": "svouch",
+  "version": "0.0.1-0",
+  "author": "rixo <rixo@rixo.fr>",
+  "license": "ISC",
+  "homepage": "https://github.com/rixo/svouch",
+  "bugs": {
+    "url": "https://github.com/rixo/svouch/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rixo/svouch"
+  },
+  "main": "dist/index.js",
+  "svelte": "dist/index.js",
+  "browser": "dist/index.js",
+  "files": [
+    "dist",
+    "index*.js",
+    "core*.js"
+  ],
+  "devDependencies": {
+    "@rixo/eslint-config-svelte": "^0.10.0-alpha.0",
+    "@rollup/plugin-commonjs": "^17.0.0",
+    "@rollup/plugin-node-resolve": "^11.0.0",
+    "objectid": "1",
+    "pouchdb-browser": "^7.2.2",
+    "pouchdb-find": "^7.2.2",
+    "pouchdb-live-find": "^0.4.0",
+    "rollup": "^2.34.1",
+    "rollup-plugin-node-builtins": "^2.1.2",
+    "rollup-plugin-node-globals": "^1.4.0",
+    "svelte": "^3.31.0"
+  },
+  "scripts": {
+    "prepublish": "yarn build",
+    "dev": "rollup -cw",
+    "build": "rollup -c",
+    "test": "echo TODO"
+  }
+}
