@@ -5,13 +5,17 @@
 
   const { dirty, busy } = todos
 
+  $: {
+    console.log($dirty)
+  }
+
   let input = ''
   let query = ''
 
   const submit = () => {
     if (input === '') {
       // just save
-      todos.commitManaged()
+      todos.commit()
     } else {
       // add
       todos.put({ text: input })
@@ -69,8 +73,10 @@
       {#each $todos as todo}
         <li class="todo">
           <input bind:value={todo.text} />
-          <button type="button" on:click={todos.removeRecord(todo)}>X</button>
+          <button type="button" on:click={() => todos.remove(todo)}>X</button>
         </li>
+      {:else}
+        <p>All good.</p>
       {/each}
     </ul>
   </form>

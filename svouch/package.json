@@ -20,10 +20,19 @@
   "peerDependencies": {
     "svelte": "^3"
   },
+  "optionalDependencies": {
+    "pouchdb-adapter-memory": "^7.2.2"
+  },
   "devDependencies": {
-    "svelte": "^3.31.0"
+    "pouchdb-adapter-memory": "^7.2.2",
+    "pouchdb-find": "^7.2.2",
+    "pouchdb-live-find": "^0.4.0",
+    "pouchdb-node": "^7.2.2",
+    "svelte": "^3.31.0",
+    "zoar": "^0.0.4",
+    "zorax": "^0.0.10"
   },
   "scripts": {
-    "test": "echo TODO"
+    "test": "zoar"
   }
 }

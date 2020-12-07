@@ -17,7 +17,7 @@ const superstructAdapter = {
 
 export const Db = (opts) =>
   coreDb({
-    PouchDB,
+    createPouch: ({ name }) => new PouchDB(name),
 
     schemaAdapter: superstructAdapter,
 

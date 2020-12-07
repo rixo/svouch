@@ -10,4 +10,6 @@ export const todos = db
       text: s.string(),
     }),
   })
-  .writable()
+  .store({
+    autoCommit: 1000,
+  })
