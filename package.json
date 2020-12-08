@@ -8,6 +8,7 @@
     "svelteSortOrder": "scripts-markup-styles"
   },
   "devDependencies": {
-    "@rixo/eslint-config-svelte": "^0.10.0-alpha.0"
+    "@rixo/eslint-config-svelte": "^0.10.0-alpha.0",
+    "svelte": "^3.31.0"
   }
 }
