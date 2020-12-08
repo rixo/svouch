@@ -1,11 +1,54 @@
 import { readable, derived } from 'svelte/store'
 
 import { noop, identity, minZero, pipe, callMethod } from './util.js'
-import { lazy, deeplyLazy, transform } from './util/store.js'
+import { lazy, deeplyLazy } from './util/store.js'
 
 const paramsFields = ['sort', 'limit', 'skip']
 
-const isRecordBusy = (record) => record.$$.saving
+const hasGreaterThanZeroSize = (x) => x.size > 0
+
+const every = (predicate) => (values) => values.every(predicate)
+
+const isTruthy = Boolean
+
+const storeSet = (initial) => {
+  const value = new Set(initial)
+
+  let cachedValues
+
+  let set
+
+  const store = readable(value, (_set) => {
+    set = _set
+    return () => {
+      set = null
+    }
+  })
+
+  const values = () => {
+    if (!cachedValues) cachedValues = [...value]
+    return cachedValues
+  }
+
+  const mutate = (fn) => (x) => {
+    const sizeBefore = value.size
+    fn(x)
+    if (sizeBefore !== value.size) {
+      cachedValues = null
+      if (set) set(value)
+    }
+  }
+
+  store.add = mutate((x) => value.add(x))
+
+  store.delete = mutate((x) => value.delete(x))
+
+  store.clear = mutate(() => value.clear())
+
+  store.map = (...args) => values().map(...args)
+
+  return store
+}
 
 const debounce = (fn, delay) => {
   if (delay === false || delay == null) return fn
@@ -15,11 +58,15 @@ const debounce = (fn, delay) => {
 
   const run = () => fn(...lastArgs)
 
-  return (...args) => {
+  const listener = (...args) => {
     lastArgs = args
     clearTimeout(timeout)
     timeout = setTimeout(run, delay)
   }
+
+  listener.cancel = () => clearTimeout(timeout)
+
+  return listener
 }
 
 const withState = (doc) => {
@@ -69,6 +116,24 @@ const withAccessors = (query, keys, setDirty) => {
   }
 }
 
+const paramAccessor = (field, store, transform = identity) => ({
+  get() {
+    return store.value[field]
+  },
+  set(value) {
+    const transformed = transform(value)
+    const force = transformed !== value
+    store.update(
+      ($params) => ({
+        ...$params,
+        [field]: transformed,
+      }),
+      force
+    )
+    return true
+  },
+})
+
 export const createSvouchStore = (
   { connect, put, lifecycle },
   {
@@ -76,7 +141,8 @@ export const createSvouchStore = (
 
     autoCommit: initialAutoCommit = false,
 
-    debounce: debounceDelay = 20,
+    debounce: debounceDelay = 25,
+    debounceEmpty: debounceEmptyDelay = 100,
 
     selector: initialSelector = {},
     fields: initialFields = undefined,
@@ -85,8 +151,6 @@ export const createSvouchStore = (
     skip = 0,
   }
 ) => {
-  const dirtyRecords = new Set()
-
   const autoCommit = lazy(initialAutoCommit)
 
   const isAutoCommit = derived(
@@ -98,6 +162,12 @@ export const createSvouchStore = (
     autoCommit,
     ($autoCommit) => typeof $autoCommit === 'number'
   )
+
+  // --- Dirty records ---
+
+  const dirtyRecords = storeSet()
+
+  const busyRecords = storeSet()
 
   // --- Error stream ---
 
@@ -111,6 +181,7 @@ export const createSvouchStore = (
 
   const save = async (record) => {
     if (!record.$$.dirty) return
+    busyRecords.add(record)
     try {
       const epoch = ++record.$$.epoch
       // WARNING don't await unconditionnally -- the function needs to be sync
@@ -120,16 +191,15 @@ export const createSvouchStore = (
       }
       if (!record.$$.dirty) return
       record.$$.saving = put(record.$$.doc)
-      updateBusy()
       await record.$$.saving
-      record.$$.saving = null
       record.$$.error = null
       unsetRecordDirty(record, epoch)
     } catch (err) {
-      record.$$.saving = null
       record.$$.error = err
-      updateBusy()
       throw err
+    } finally {
+      record.$$.saving = null
+      busyRecords.remove(record)
     }
   }
 
@@ -139,7 +209,13 @@ export const createSvouchStore = (
 
   // const commit = () => Promise.all([...dirtyRecords].map(save))
 
-  const commitManaged = () => Promise.all([...dirtyRecords].map(saveManaged))
+  const commitManaged = () => {
+    return Promise.all(
+      dirtyRecords.map((x) => {
+        return saveManaged(x)
+      })
+    )
+  }
 
   // --- Auto commit ---
 
@@ -180,52 +256,16 @@ export const createSvouchStore = (
 
   // --- Dirty / busy ---
 
-  let updateDirty = noop
-  let updateBusy = noop
-
-  const isDirty = () => dirtyRecords.size > 0
-
-  const isBusy = () => {
-    for (const record of dirtyRecords) {
-      if (isRecordBusy(record)) return true
-    }
-    return false
-  }
-
-  const dirty = lazy(false, (set) => {
-    updateDirty = () => set(isDirty())
-    updateDirty()
-    return () => {
-      updateDirty = noop
-    }
-  })
-
-  const busy = lazy(false, (set) => {
-    updateBusy = () => set(isBusy())
-
-    updateBusy()
-
-    return () => {
-      updateBusy = noop
-    }
-  })
+  const updateDirty = noop
+  const updateBusy = noop
 
   // --- Feed & docs ---
 
-  const pagination = transform(
-    lazy({
-      sort,
-      limit,
-      skip,
-    }),
-    // ensure we only get valid params in the store
-    ({ sort, limit, skip }) => ({
-      ...pagination.value,
-      sort,
-      limit: limit && minZero(limit),
-      skip: skip && minZero(skip),
-    })
-  )
+  const pagination = deeplyLazy({
+    sort,
+    limit,
+    skip,
+  })
 
   const query = deeplyLazy({
     selector: initialSelector,
@@ -237,74 +277,30 @@ export const createSvouchStore = (
     accessors && withAccessors(query, accessors, setDirty)
   )
 
-  const paginationAccessor = (field, livefeed, transform = identity) => ({
-    get() {
-      return pagination.value[field]
-    },
-    set(value) {
-      pagination.update(($params) => ({
-        ...$params,
-        [field]: transform(value),
-      }))
-      return true
-    },
-  })
-
-  const queryAccessor = (field) => ({
-    get() {
-      return query.value[field]
-    },
-    set(value) {
-      query.update(($query) => ({
-        ...$query,
-        [field]: value,
-      }))
-      // query.set({
-      //   ...query.value,
-      //   [field]: value,
-      // })
-      return true
-    },
-  })
-
-  const withParamsAccessors = (liveFeed, records) => {
+  const withApi = (liveFeed, records) => {
+    // -- Params --
+    //
     Object.defineProperties(records, {
-      sort: paginationAccessor('sort', liveFeed),
-      limit: paginationAccessor('limit', liveFeed, minZero),
-      skip: paginationAccessor('skip', liveFeed, minZero),
-
-      selector: queryAccessor('selector'),
-      fields: queryAccessor('fields'),
-
-      // selector: {
-      //   get() {
-      //     return query.value.selector
-      //   },
-      //   set(value) {
-      //     const field = 'selector'
-      //     const previous = pagination.value[field]
-      //     if (value !== previous) {
-      //       pagination.value[field] = value
-      //     }
-      //     pagination.value[field] = value
-      //     query.update((x) => ({
-      //       ...x,
-      //       selector: value,
-      //     }))
-      //     return true
-      //   },
-      // },
-
-      ready: {
-        get() {
-          return liveFeed.then
-        },
-      },
+      // query
+      selector: paramAccessor('selector', query),
+      fields: paramAccessor('fields', query),
+      // pagination
+      sort: paramAccessor('sort', pagination),
+      limit: paramAccessor('limit', pagination, minZero),
+      skip: paramAccessor('skip', pagination, minZero),
     })
+
+    // -- Methods --
+    //
+    Object.assign(records, {
+      ready: whenReady,
+      commit: commitManaged,
+    })
+
     return records
   }
 
-  // recreate feed when selector change
+  // recreate feed when selector or query changes
   const liveFeed = derived(query, ($query, set) => {
     const { selector, fields } = $query
 
@@ -336,12 +332,22 @@ export const createSvouchStore = (
     }
   })
 
+  const liveFeedStarted = lazy(false)
+
   const docs = derived(
     liveFeed,
     ($feed, set) => {
+      liveFeedStarted.set(false)
+
+      const emptyTimeout = setTimeout(() => {
+        set([])
+        liveFeedStarted.set(true)
+      }, debounceEmptyDelay)
+
       const listener = debounce((event, docs) => {
-        // console.log('set >>', docs)
-        return set(docs)
+        clearTimeout(emptyTimeout)
+        set(docs)
+        liveFeedStarted.set(true)
       }, debounceDelay)
 
       $feed.on('update', listener)
@@ -349,6 +355,8 @@ export const createSvouchStore = (
       docs.set = set
 
       return () => {
+        clearTimeout(emptyTimeout)
+        if (listener.cancel) listener.cancel()
         $feed.removeListener('update', listener)
       }
     },
@@ -356,22 +364,47 @@ export const createSvouchStore = (
   )
 
   const records = derived([liveFeed, docs], ([$liveFeed, $docs]) =>
-    withParamsAccessors($liveFeed, $docs.map(docToRecord))
+    withApi($liveFeed, $docs.map(docToRecord))
   )
 
-  // const store = derived(
-  //   [records, paginator, isAutoCommit, isDeferredAutoCommit],
-  //   ([$records]) => {
-  //     // apply pre subscribe (e.g. during component init) params
-  //     store.set = (value) => {
-  //       if (value !== $records) {
-  //         Object.assign($records, value)
-  //       }
-  //     }
-  //     return $records
-  //   },
-  //   []
-  // )
+  // --- Ready ---
+
+  const liveFeedReady = derived(
+    liveFeed,
+    ($feed, set) => {
+      let canceled = false
+      ready.value = false
+      set(false)
+      $feed.then(() => {
+        if (canceled) return
+        ready.value = true
+        set(true)
+      })
+      return () => {
+        canceled = true
+      }
+    },
+    false
+  )
+
+  const ready = derived([liveFeedStarted, liveFeedReady], every(isTruthy))
+
+  const readyListeners = []
+
+  const whenReady = () => {
+    if (ready.value) return Promise.resolve()
+    return new Promise((resolve) => {
+      readyListeners.push(resolve)
+    })
+  }
+
+  // --- Dirty / busy ---
+
+  const dirty = derived(dirtyRecords, hasGreaterThanZeroSize)
+
+  const busy = derived(busyRecords, hasGreaterThanZeroSize)
+
+  // ---
 
   const depStores = [paginator, isAutoCommit, isDeferredAutoCommit]
 
@@ -395,16 +428,43 @@ export const createSvouchStore = (
     )
 
     disposers.push(async () => {
+      // commit pending records if auto commit is on
       if (isAutoCommit.value) {
         await commitManaged()
       }
-      await Promise.all([...dirtyRecords].map(({ $$ }) => $$.saving))
+
+      // wait for busy records to finish operations
+      while (busyRecords.size > 0) {
+        await Promise.all(busyRecords.map(({ $$ }) => $$.saving))
+      }
+
+      // clear dirty / busy records
       dirtyRecords.clear()
+      busyRecords.clear()
     })
+
+    disposers.push(
+      ready.subscribe(($ready) => {
+        if ($ready) {
+          while (readyListeners.length > 0) {
+            readyListeners.shift()()
+          }
+        }
+      })
+    )
+
+    // prevent publishing negative values for skip / limit
+    disposers.push(
+      pagination.subscribe(() => {
+        set($records)
+      })
+    )
 
     if (lifecycle) {
       disposers.push(lifecycle(store))
     }
+
+    // API
 
     store.set = (value) => {
       // apply pre subscribe (e.g. during component init) params
@@ -412,6 +472,8 @@ export const createSvouchStore = (
         Object.assign($records, value)
       }
     }
+
+    // Init
 
     set($records)
 
@@ -421,9 +483,6 @@ export const createSvouchStore = (
   Object.assign(store, {
     dirty,
     busy,
-
-    commit: commitManaged,
-    // raw: { commit },
 
     put,
   })

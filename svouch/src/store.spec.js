@@ -107,56 +107,6 @@ describe('operations', () => {
     t.eq($store.map(getProp('value')), ['foo', 'bar'])
     t.eq($store[0].value, 'foo')
 
-    $store[0].value = 'foot'
-    // store.commit()
-
-    cancel()
-
-    cancel = store.subscribe((x) => {
-      $store = x
-    })
-
-    await $store.ready()
-
-    t.eq($store.map(getProp('value')), ['foo', 'bar'])
-
-    $store[0].value = 'foot'
-    store.commit()
-
-    cancel()
-
-    cancel = store.subscribe((x) => {
-      $store = x
-    })
-
-    await $store.ready()
-
-    t.eq($store.map(getProp('value')), ['foot', 'bar'])
-
-    cancel()
-  })
-
-  test('commit', withPouch, async (t, pouch) => {
-    const store = createSvouchStore(pouch, {
-      accessors: ['value'],
-      debounce: false,
-    })
-
-    await pouch.put({ value: 'foo' })
-    await pouch.put({ value: 'bar' })
-
-    let $store
-    let cancel
-
-    cancel = store.subscribe((x) => {
-      $store = x
-    })
-
-    await $store.ready()
-
-    t.eq($store.map(getProp('value')), ['foo', 'bar'])
-    t.eq($store[0].value, 'foo')
-
     $store[0].value = 'foobar'
 
     cancel()
@@ -174,7 +124,7 @@ describe('operations', () => {
     )
 
     $store[0].value = 'foot'
-    store.commit()
+    $store.commit()
 
     cancel()
 
@@ -192,124 +142,142 @@ describe('operations', () => {
   })
 })
 
-describe('params', () => {
-  test('sort, limit, skip', withPouch, async (t, pouch) => {
-    const store = createSvouchStore(pouch, {
-      accessors: ['value'],
-      debounce: false,
-    })
+for (const debounce of [false, 5]) {
+  describe(`params`, () => {
+    test(
+      `sort, limit, skip${debounce ? ' (debounce)' : ''}`,
+      withPouch,
+      async (t, pouch) => {
+        const store = createSvouchStore(pouch, {
+          accessors: ['value'],
+          debounce,
+        })
 
-    await pouch.put({ value: 'foo' })
-    await pouch.put({ value: 'bar' })
-    await pouch.put({ value: 'baz' })
+        await pouch.put({ value: 'foo' })
+        await pouch.put({ value: 'bar' })
+        await pouch.put({ value: 'baz' })
 
-    let $store
+        let $store
+        let notified = 0
 
-    const cancel = store.subscribe((x) => {
-      $store = x
-    })
+        const cancel = store.subscribe((x) => {
+          notified++
+          $store = x
+        })
 
-    await $store.ready()
+        await $store.ready()
 
-    t.eq($store.map(getProp('value')), ['foo', 'bar', 'baz'])
+        t.eq($store.map(getProp('value')), ['foo', 'bar', 'baz'], 'initial')
 
-    $store.sort = [{ _id: 'desc' }]
+        $store.sort = [{ _id: 'desc' }]
 
-    t.eq($store.map(getProp('value')), ['baz', 'bar', 'foo'])
+        t.eq($store.map(getProp('value')), ['baz', 'bar', 'foo'], 'after sort')
 
-    $store.limit = 2
+        $store.limit = 2
 
-    t.eq($store.map(getProp('value')), ['baz', 'bar'])
+        t.eq($store.map(getProp('value')), ['baz', 'bar'], 'after limit')
 
-    $store.skip = 1
+        $store.skip = 1
 
-    t.eq($store.map(getProp('value')), ['bar', 'foo'])
+        t.eq($store.map(getProp('value')), ['bar', 'foo'], 'after skip')
 
-    cancel()
-  })
+        notified = 0
+        $store.limit = -1
+        t.ok(notified, 'capping limit to 0 is notified')
+        t.eq($store.limit, 0, "limit can't be set less than 0")
 
-  test('fields', withPouch, async (t, pouch) => {
-    const store = createSvouchStore(pouch, {
-      accessors: ['value', 'x'],
-      debounce: false,
-    })
+        notified = 0
+        $store.skip = -1
+        t.ok(notified, 'capping skip to 0 is notified')
+        t.eq($store.skip, 0, "skip can't be set less than 0")
 
-    await pouch.put({ value: 'foo', x: 41 })
-    await pouch.put({ value: 'bar', x: 42 })
-    await pouch.put({ value: 'baz', x: 43 })
-
-    let $store
-
-    const cancel = store.subscribe((x) => {
-      $store = x
-    })
-
-    await $store.ready()
-
-    t.eq(
-      [...$store],
-      [
-        { value: 'foo', x: 41 },
-        { value: 'bar', x: 42 },
-        { value: 'baz', x: 43 },
-      ]
+        cancel()
+      }
     )
 
-    $store.fields = ['x']
+    test('fields', withPouch, async (t, pouch) => {
+      const store = createSvouchStore(pouch, {
+        accessors: ['value', 'x'],
+        debounce,
+      })
 
-    await $store.ready()
+      await pouch.put({ value: 'foo', x: 41 })
+      await pouch.put({ value: 'bar', x: 42 })
+      await pouch.put({ value: 'baz', x: 43 })
 
-    t.eq([...$store], [{ x: 41 }, { x: 42 }, { x: 43 }])
+      let $store
 
-    $store.fields = ['value']
+      const cancel = store.subscribe((x) => {
+        $store = x
+      })
 
-    await $store.ready()
+      await $store.ready()
 
-    t.eq([...$store], [{ value: 'foo' }, { value: 'bar' }, { value: 'baz' }])
+      t.eq(
+        [...$store],
+        [
+          { value: 'foo', x: 41 },
+          { value: 'bar', x: 42 },
+          { value: 'baz', x: 43 },
+        ]
+      )
 
-    cancel()
-  })
+      $store.fields = ['x']
 
-  test('selector', withPouch, async (t, pouch) => {
-    const store = createSvouchStore(pouch, {
-      accessors: ['value'],
-      debounce: false,
+      await $store.ready()
+
+      t.eq([...$store], [{ x: 41 }, { x: 42 }, { x: 43 }])
+
+      $store.fields = ['value']
+
+      await $store.ready()
+
+      t.eq([...$store], [{ value: 'foo' }, { value: 'bar' }, { value: 'baz' }])
+
+      cancel()
     })
 
-    await pouch.put({ value: 'foo' })
-    await pouch.put({ value: 'bar' })
-    await pouch.put({ value: 'baz' })
+    test('selector', withPouch, async (t, pouch) => {
+      const store = createSvouchStore(pouch, {
+        accessors: ['value'],
+        debounce,
+      })
 
-    let $store
+      await pouch.put({ value: 'foo' })
+      await pouch.put({ value: 'bar' })
+      await pouch.put({ value: 'baz' })
 
-    const cancel = store.subscribe((x) => {
-      $store = x
+      let $store
+
+      const cancel = store.subscribe((x) => {
+        $store = x
+      })
+
+      await $store.ready()
+
+      t.eq($store.map(getProp('value')), ['foo', 'bar', 'baz'])
+
+      $store.selector = { value: { $regex: '^b' } }
+
+      await $store.ready()
+
+      t.eq($store.map(getProp('value')), ['bar', 'baz'])
+
+      $store.limit = 1
+
+      t.eq($store.map(getProp('value')), ['bar'])
+
+      $store.selector = {}
+      $store.limit = 0
+
+      await $store.ready()
+
+      t.eq($store.map(getProp('value')), ['foo', 'bar', 'baz'])
+
+      cancel()
     })
-
-    await $store.ready()
-
-    t.eq($store.map(getProp('value')), ['foo', 'bar', 'baz'])
-
-    $store.selector = { value: { $regex: '^b' } }
-
-    await $store.ready()
-
-    t.eq($store.map(getProp('value')), ['bar', 'baz'])
-
-    $store.limit = 1
-
-    t.eq($store.map(getProp('value')), ['bar'])
-
-    $store.selector = {}
-    $store.limit = 0
-
-    await $store.ready()
-
-    t.eq($store.map(getProp('value')), ['foo', 'bar', 'baz'])
-
-    cancel()
   })
-})
+}
 
 describe('sub stores', () => {
   test('dirty', withPouch, async (t, pouch) => {
@@ -352,8 +320,8 @@ describe('sub stores', () => {
 
     cancel()
 
-    t.ok($dirty, 'remains dirty when the store has no subscribers')
-    t.notOk($busy, 'is not busy when the store has no subscribers')
+    t.notOk($dirty, 'is never dirty when the store has no subscribers')
+    t.notOk($busy, 'is never busy when the store has no subscribers')
 
     cancel = store.subscribe((x) => {
       $store = x
@@ -363,7 +331,7 @@ describe('sub stores', () => {
 
     $store[0].value = 'foot'
 
-    store.commit()
+    $store.commit()
 
     t.ok($busy, 'is busy while a record is being saved')
 

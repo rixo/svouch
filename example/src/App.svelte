@@ -6,7 +6,7 @@
   const { dirty, busy } = todos
 
   $: {
-    console.log($dirty)
+    console.log($dirty, $busy)
   }
 
   let input = ''
@@ -15,7 +15,7 @@
   const submit = () => {
     if (input === '') {
       // just save
-      todos.commit()
+      $todos.commit()
     } else {
       // add
       todos.put({ text: input })
@@ -41,7 +41,7 @@
       <label><span>skip: </span><input
           type="number"
           bind:value={$todos.skip} /></label>
-      <label> <span>search:</span> <input bind:value={query} /> </label>
+      <label><span>search:</span> <input bind:value={query} /></label>
 
       <label>
         <span>sort:</span>
@@ -57,7 +57,7 @@
       <button
         type="button"
         disabled={!$dirty}
-        on:click={todos.commitManaged}>Save</button>
+        on:click={$todos.commit}>Save</button>
 
       <span class="status" hidden={!$dirty}>Dirty</span>
       <span class="status" hidden={!$busy}>Busy</span>

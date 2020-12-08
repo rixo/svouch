@@ -10,15 +10,19 @@ export const makeLazy = (equals) => (initial, ...args) => {
 
   const set = store.set
 
-  store.set = (value) => {
-    if (!equals(value, store.value)) {
+  store.set = (value, force = false) => {
+    if (force || !equals(value, store.value)) {
       store.value = value
       set(value)
     }
   }
 
-  store.update = (fn) => {
-    store.set(fn(store.value))
+  store.update = (fn, force = false) => {
+    store.set(fn(store.value), force)
+  }
+
+  store.ping = () => {
+    set(store.value)
   }
 
   return store
@@ -40,11 +44,3 @@ const dumbDeepEquals = (a, b) => {
 }
 
 export const deeplyLazy = makeLazy(dumbDeepEquals)
-
-export const transform = (store, transform) => {
-  const { set } = store
-
-  store.set = (value) => set(transform(value))
-
-  return store
-}
