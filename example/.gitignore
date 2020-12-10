@@ -2,3 +2,7 @@
 build
 web_modules
 node_modules
+
+# pouchdb-server
+/pouchdb/config.json
+/pouchdb/log.txt

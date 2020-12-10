@@ -1,0 +1,7 @@
+version: '3'
+
+services:
+  pouchdb:
+    build: ./pouchdb
+    volumes:
+      - ./pouchdb:/db
