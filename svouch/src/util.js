@@ -15,3 +15,5 @@ export const pipe = (...fns) => {
 
 export const isDeferredAutoCommit = (autoCommit) =>
   typeof autoCommit === 'number'
+
+export const yup = () => true

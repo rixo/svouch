@@ -1,4 +1,6 @@
-import { writable } from 'svelte/store'
+import { writable, derived } from 'svelte/store'
+
+import { yup } from '../util.js'
 
 // - don't trigger a change event if set value is the same
 // - expose current (last) value publicly
@@ -30,17 +32,74 @@ export const makeLazy = (equals) => (initial, ...args) => {
 
 export const lazy = makeLazy((a, b) => a === b)
 
+const isPrimitive = (x) => x !== Object(x)
+
 const dumbDeepEquals = (a, b) => {
   if (a === b) return true
+  if (isPrimitive(a)) return a === b
   // if they're falsy but not strictly equal, then they're not equal
   if (!a || !b) return false
   const ka = Object.keys(a)
   const kb = Object.keys(b)
   if (ka.length !== kb.length) return false
   for (const k of ka) {
-    if (a[k] !== b[k]) return false
+    // if (a[k] !== b[k]) return false
+    if (!dumbDeepEquals(a[k], b[k])) return false
   }
   return true
 }
 
 export const deeplyLazy = makeLazy(dumbDeepEquals)
+
+export const dedupe = (store) =>
+  derived(store, ($x, set) => {
+    let initial = true
+    let last
+    if (initial || $x !== last) {
+      initial = false
+      last = $x
+      set($x)
+    }
+  })
+
+export const debounced = (store, debounce, initial, predicate = yup) =>
+  derived(
+    store,
+    ($x, _set) => {
+      const notify = () => _set($x)
+
+      let timeout
+
+      if (debounce !== false && predicate($x)) {
+        timeout = setTimeout(notify, debounce)
+      } else {
+        notify()
+      }
+
+      return () => {
+        clearTimeout(timeout)
+      }
+    },
+    initial
+  )
+
+export const listening = (store, event, initial, getValue) =>
+  derived(
+    store,
+    ($x, set) => {
+      store.value = false
+      set(initial)
+
+      const listener = (...args) => {
+        store.value = getValue(...args)
+        set(store.value)
+      }
+
+      $x.on(event, listener)
+
+      return () => {
+        $x.removeListener(event, listener)
+      }
+    },
+    initial
+  )

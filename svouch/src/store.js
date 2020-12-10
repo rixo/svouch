@@ -1,15 +1,24 @@
 import { readable, derived } from 'svelte/store'
 
 import { noop, identity, minZero, pipe, callMethod } from './util.js'
-import { lazy, deeplyLazy } from './util/store.js'
+import { lazy, deeplyLazy, debounced, listening } from './util/store.js'
 
 const paramsFields = ['sort', 'limit', 'skip']
 
 const hasGreaterThanZeroSize = (x) => x.size > 0
 
-const every = (predicate) => (values) => values.every(predicate)
-
-const isTruthy = Boolean
+const deferred = () => {
+  let resolve
+  let reject
+  const promise = new Promise((_resolve, _reject) => {
+    resolve = _resolve
+    reject = _reject
+  }).finally(() => {
+    o.resolved = true
+  })
+  const o = { promise, resolve, reject, resolved: false }
+  return o
+}
 
 const storeSet = (initial) => {
   const value = new Set(initial)
@@ -48,25 +57,6 @@ const storeSet = (initial) => {
   store.map = (...args) => values().map(...args)
 
   return store
-}
-
-const debounce = (fn, delay) => {
-  if (delay === false || delay == null) return fn
-
-  let lastArgs
-  let timeout
-
-  const run = () => fn(...lastArgs)
-
-  const listener = (...args) => {
-    lastArgs = args
-    clearTimeout(timeout)
-    timeout = setTimeout(run, delay)
-  }
-
-  listener.cancel = () => clearTimeout(timeout)
-
-  return listener
 }
 
 const withState = (doc) => {
@@ -134,15 +124,19 @@ const paramAccessor = (field, store, transform = identity) => ({
   },
 })
 
+const mergeAccessors = (...sources) => sources.filter(Boolean).flat()
+
 export const createSvouchStore = (
-  { connect, put, lifecycle },
+  { connect, put, remove, lifecycle },
   {
     accessors,
+    defaultAccessors = ['_id'],
 
     autoCommit: initialAutoCommit = false,
 
-    debounce: debounceDelay = 25,
-    debounceEmpty: debounceEmptyDelay = 100,
+    debounce = 250,
+    debounceReady = debounce, // debounce ready state (~loading)
+    debounceEmpty = debounce, // debounce empty state
 
     selector: initialSelector = {},
     fields: initialFields = undefined,
@@ -151,17 +145,17 @@ export const createSvouchStore = (
     skip = 0,
   }
 ) => {
+  // --- Auto commit ---
+
   const autoCommit = lazy(initialAutoCommit)
 
-  const isAutoCommit = derived(
-    autoCommit,
-    ($autoCommit) => $autoCommit !== false && $autoCommit != null
-  )
+  const isAutoCommit = derived(autoCommit, ($autoCommit) => {
+    return (isAutoCommit.value = $autoCommit !== false && $autoCommit != null)
+  })
 
-  const isDeferredAutoCommit = derived(
-    autoCommit,
-    ($autoCommit) => typeof $autoCommit === 'number'
-  )
+  const isDeferredAutoCommit = derived(autoCommit, ($autoCommit) => {
+    return (isDeferredAutoCommit.value = typeof $autoCommit === 'number')
+  })
 
   // --- Dirty records ---
 
@@ -199,7 +193,7 @@ export const createSvouchStore = (
       throw err
     } finally {
       record.$$.saving = null
-      busyRecords.remove(record)
+      busyRecords.delete(record)
     }
   }
 
@@ -222,19 +216,12 @@ export const createSvouchStore = (
   const setRecordDirty = (record) => {
     record.$$.dirty = true
     dirtyRecords.add(record)
-    updateDirty()
-    updateBusy()
   }
 
   const unsetRecordDirty = (record, epoch) => {
-    if (record.$$.epoch === epoch) {
-      record.$$.dirty = false
-      dirtyRecords.delete(record)
-      updateDirty()
-    }
-    // NOTE we might still be dirty, but we've still just ended a request, so
-    // maybe we're not busy anymore
-    updateBusy()
+    if (record.$$.epoch !== epoch) return
+    record.$$.dirty = false
+    dirtyRecords.delete(record)
   }
 
   const setDirty = (record) => {
@@ -248,16 +235,11 @@ export const createSvouchStore = (
       if (record.$$.commitTimeout) {
         clearTimeout(record.$$.commitTimeout)
       }
-      record.$$.commitTimeout = setTimeout(commitRecord, autoCommit)
+      record.$$.commitTimeout = setTimeout(commitRecord, autoCommit.value)
     } else {
       commitRecord()
     }
   }
-
-  // --- Dirty / busy ---
-
-  const updateDirty = noop
-  const updateBusy = noop
 
   // --- Feed & docs ---
 
@@ -274,7 +256,8 @@ export const createSvouchStore = (
 
   const docToRecord = pipe(
     withState,
-    accessors && withAccessors(query, accessors, setDirty)
+    accessors &&
+      withAccessors(query, mergeAccessors(defaultAccessors, accessors), setDirty)
   )
 
   const withApi = (liveFeed, records) => {
@@ -288,13 +271,48 @@ export const createSvouchStore = (
       sort: paramAccessor('sort', pagination),
       limit: paramAccessor('limit', pagination, minZero),
       skip: paramAccessor('skip', pagination, minZero),
+
+      // docs: {
+      //   get() {
+      //     return docsPromise.value
+      //   },
+      //   set() {
+      //     throw new Error('Cannot write to $store.docs')
+      //   },
+      // },
+
+      // ready: {
+      //   get() {
+      //     return readyPromise.value
+      //   },
+      //   set() {
+      //     throw new Error('Cannot write to $store.ready')
+      //   },
+      // },
     })
 
     // -- Methods --
     //
     Object.assign(records, {
-      ready: whenReady,
+      whenReady,
+      ready: readyDeferred.promise,
       commit: commitManaged,
+
+      put(doc) {
+        return put(doc).catch(pushError)
+      },
+
+      remove(record) {
+        busyRecords.add(record)
+        return remove(record)
+          .then(() => {
+            dirtyRecords.delete(record)
+          })
+          .catch(pushError)
+          .finally(() => {
+            busyRecords.delete(record)
+          })
+      },
     })
 
     return records
@@ -327,72 +345,34 @@ export const createSvouchStore = (
       paramsFields.some((field) => $feed.params[field] !== $params[field])
     ) {
       const newDocs = $feed.paginate($params)
-      docs.set(newDocs)
       $feed.params = $params
+      $feed.emit('update', null, newDocs)
     }
   })
 
-  const liveFeedStarted = lazy(false)
+  const docs = listening(liveFeed, 'update', [], (event, docs) => docs)
 
-  const docs = derived(
-    liveFeed,
-    ($feed, set) => {
-      liveFeedStarted.set(false)
-
-      const emptyTimeout = setTimeout(() => {
-        set([])
-        liveFeedStarted.set(true)
-      }, debounceEmptyDelay)
-
-      const listener = debounce((event, docs) => {
-        clearTimeout(emptyTimeout)
-        set(docs)
-        liveFeedStarted.set(true)
-      }, debounceDelay)
-
-      $feed.on('update', listener)
-
-      docs.set = set
-
-      return () => {
-        clearTimeout(emptyTimeout)
-        if (listener.cancel) listener.cancel()
-        $feed.removeListener('update', listener)
-      }
-    },
-    []
+  const debouncedDocs = debounced(
+    docs,
+    debounceEmpty,
+    [],
+    ($x) => $x.length === 0
   )
 
-  const records = derived([liveFeed, docs], ([$liveFeed, $docs]) =>
+  const records = derived([liveFeed, debouncedDocs], ([$liveFeed, $docs]) =>
     withApi($liveFeed, $docs.map(docToRecord))
   )
 
   // --- Ready ---
 
-  const liveFeedReady = derived(
-    liveFeed,
-    ($feed, set) => {
-      let canceled = false
-      ready.value = false
-      set(false)
-      $feed.then(() => {
-        if (canceled) return
-        ready.value = true
-        set(true)
-      })
-      return () => {
-        canceled = true
-      }
-    },
-    false
-  )
+  const liveFeedReady = listening(liveFeed, 'ready', false, () => true)
 
-  const ready = derived([liveFeedStarted, liveFeedReady], every(isTruthy))
+  const ready = debounced(liveFeedReady, debounceReady, false)
 
   const readyListeners = []
 
   const whenReady = () => {
-    if (ready.value) return Promise.resolve()
+    if (liveFeedReady.value) return Promise.resolve()
     return new Promise((resolve) => {
       readyListeners.push(resolve)
     })
@@ -408,15 +388,63 @@ export const createSvouchStore = (
 
   const depStores = [paginator, isAutoCommit, isDeferredAutoCommit]
 
+  // const docsPromise = derived([ready, records], ([$ready, $records], set) => {
+  //   const next = $ready ? Promise.resolve($records) : never
+  //   clearTimeout(docsPromise.timeout)
+  //   if (next === never && debounce !== false) {
+  //     docsPromise.timeout = setTimeout(() => {
+  //       set((docsPromise.value = next))
+  //     }, debounce)
+  //   } else {
+  //     set((docsPromise.value = next))
+  //   }
+  // })
+  //
+  // docsPromise.value = never
+  //
+  // const readyPromise = derived([ready], ([$ready], set) => {
+  //   readyPromise.value = $ready ? Promise.resolve() : never
+  //   set(readyPromise.value)
+  // })
+  //
+  // readyPromise.value = never
+
+  let readyDeferred = deferred()
+
+  const readyPromise = derived(
+    ready,
+    ($ready, set) => {
+      if ($ready) {
+        readyDeferred.resolve()
+      } else if (readyDeferred.resolved) {
+        readyDeferred = deferred()
+        set(readyDeferred.promise)
+      }
+    },
+    readyDeferred.promise
+  )
+
   const store = readable([], (set) => {
     const disposers = depStores.map(callMethod('subscribe', noop))
 
     let $records = []
 
+    const notify = () => {
+      set($records)
+    }
+
     disposers.push(
       records.subscribe((recs) => {
         $records = recs
-        set($records)
+        notify()
+      })
+    )
+
+    disposers.push(
+      readyPromise.subscribe(($readyPromise) => {
+        if ($records.ready === $readyPromise) return
+        $records.ready = $readyPromise
+        notify()
       })
     )
 
@@ -444,7 +472,7 @@ export const createSvouchStore = (
     })
 
     disposers.push(
-      ready.subscribe(($ready) => {
+      liveFeedReady.subscribe(($ready) => {
         if ($ready) {
           while (readyListeners.length > 0) {
             readyListeners.shift()()
@@ -453,12 +481,9 @@ export const createSvouchStore = (
       })
     )
 
+    // FIXME this shouldn't be needed?
     // prevent publishing negative values for skip / limit
-    disposers.push(
-      pagination.subscribe(() => {
-        set($records)
-      })
-    )
+    disposers.push(pagination.subscribe(notify))
 
     if (lifecycle) {
       disposers.push(lifecycle(store))
@@ -483,8 +508,6 @@ export const createSvouchStore = (
   Object.assign(store, {
     dirty,
     busy,
-
-    put,
   })
 
   return store

@@ -18,15 +18,18 @@
       $todos.commit()
     } else {
       // add
-      todos.put({ text: input })
+      $todos.put({ text: input })
       input = ''
     }
   }
 
-  $todos.sort = [{ _id: 'asc' }]
+  const sortField = 'text'
+  let sortDir = 'asc'
+
+  $: $todos.sort = [{ [sortField]: sortDir }]
 
   const sort = (dir) => () => {
-    $todos.sort = [{ _id: dir }]
+    sortDir = dir
   }
 
   $: $todos.selector = query ? { text: { $regex: query } } : {}
@@ -59,8 +62,8 @@
         disabled={!$dirty}
         on:click={$todos.commit}>Save</button>
 
-      <span class="status" hidden={!$dirty}>Dirty</span>
-      <span class="status" hidden={!$busy}>Busy</span>
+      <!-- <span class="status" hidden={!$dirty}>Dirty</span> -->
+      <span class="status" hidden={!$busy}>Saving...</span>
     </div>
 
     <pre>
@@ -69,16 +72,24 @@
 {'$todos.selector = ' + JSON.stringify($todos.selector, false, 2)}
     </pre>
 
-    <ul>
-      {#each $todos as todo}
-        <li class="todo">
-          <input bind:value={todo.text} />
-          <button type="button" on:click={() => todos.remove(todo)}>X</button>
-        </li>
-      {:else}
-        <p>All good.</p>
-      {/each}
-    </ul>
+    {#await $todos.ready}
+      <p>Loading...</p>
+    {:then}
+      <ul>
+        {#each $todos as todo (todo._id)}
+          <li class="todo" data-id={todo._id}>
+            <input bind:value={todo.text} />
+            <button
+              type="button"
+              on:click={() => $todos.remove(todo)}>X</button>
+          </li>
+        {:else}
+          <p>Nothing here B-)</p>
+        {/each}
+      </ul>
+    {:catch}
+      <p>Shit?!</p>
+    {/await}
   </form>
 </main>
 

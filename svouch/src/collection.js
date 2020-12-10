@@ -76,6 +76,7 @@ export const createCollection = (
       {
         connect,
         put,
+        remove,
         lifecycle: addStore,
       },
       {

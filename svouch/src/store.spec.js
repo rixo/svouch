@@ -79,7 +79,7 @@ describe('operations', () => {
       $store = x
     })
 
-    await $store.ready()
+    await $store.whenReady()
 
     t.eq($store.map(getProp('value')), ['foo', 'bar'])
 
@@ -102,7 +102,7 @@ describe('operations', () => {
       $store = x
     })
 
-    await $store.ready()
+    await $store.whenReady()
 
     t.eq($store.map(getProp('value')), ['foo', 'bar'])
     t.eq($store[0].value, 'foo')
@@ -115,7 +115,7 @@ describe('operations', () => {
       $store = x
     })
 
-    await $store.ready()
+    await $store.whenReady()
 
     t.eq(
       $store.map(getProp('value')),
@@ -132,71 +132,72 @@ describe('operations', () => {
       $store = x
     })
 
-    await $store.ready()
+    await $store.whenReady()
 
     t.eq(
       $store.map(getProp('value')),
       ['foot', 'bar'],
       'value is persisted after commit'
     )
+
+    cancel()
   })
 })
 
 for (const debounce of [false, 5]) {
-  describe(`params`, () => {
-    test(
-      `sort, limit, skip${debounce ? ' (debounce)' : ''}`,
-      withPouch,
-      async (t, pouch) => {
-        const store = createSvouchStore(pouch, {
-          accessors: ['value'],
-          debounce,
-        })
+  const _debounce = debounce ? ' (debounce)' : ''
 
-        await pouch.put({ value: 'foo' })
-        await pouch.put({ value: 'bar' })
-        await pouch.put({ value: 'baz' })
-
-        let $store
-        let notified = 0
-
-        const cancel = store.subscribe((x) => {
-          notified++
-          $store = x
-        })
-
-        await $store.ready()
-
-        t.eq($store.map(getProp('value')), ['foo', 'bar', 'baz'], 'initial')
-
-        $store.sort = [{ _id: 'desc' }]
-
-        t.eq($store.map(getProp('value')), ['baz', 'bar', 'foo'], 'after sort')
-
-        $store.limit = 2
-
-        t.eq($store.map(getProp('value')), ['baz', 'bar'], 'after limit')
-
-        $store.skip = 1
-
-        t.eq($store.map(getProp('value')), ['bar', 'foo'], 'after skip')
-
-        notified = 0
-        $store.limit = -1
-        t.ok(notified, 'capping limit to 0 is notified')
-        t.eq($store.limit, 0, "limit can't be set less than 0")
-
-        notified = 0
-        $store.skip = -1
-        t.ok(notified, 'capping skip to 0 is notified')
-        t.eq($store.skip, 0, "skip can't be set less than 0")
-
-        cancel()
-      }
-    )
-
-    test('fields', withPouch, async (t, pouch) => {
+  describe('params' + _debounce, () => {
+    test('sort, limit, skip$' + _debounce, withPouch, async (t, pouch) => {
       const store = createSvouchStore(pouch, {
+        accessors: ['value'],
+        debounce,
+      })
+
+      await pouch.put({ value: 'foo' })
+      await pouch.put({ value: 'bar' })
+      await pouch.put({ value: 'baz' })
+
+      let $store
+      let notified = 0
+
+      const cancel = store.subscribe((x) => {
+        notified++
+        $store = x
+      })
+
+      await $store.whenReady()
+
+      t.eq($store.map(getProp('value')), ['foo', 'bar', 'baz'], 'initial')
+
+      $store.sort = [{ _id: 'desc' }]
+
+      t.eq($store.map(getProp('value')), ['baz', 'bar', 'foo'], 'after sort')
+
+      $store.limit = 2
+
+      t.eq($store.map(getProp('value')), ['baz', 'bar'], 'after limit')
+
+      $store.skip = 1
+
+      t.eq($store.map(getProp('value')), ['bar', 'foo'], 'after skip')
+
+      notified = 0
+      $store.limit = -1
+      t.ok(notified, 'capping limit to 0 is notified')
+      t.eq($store.limit, 0, "limit can't be set less than 0")
+
+      notified = 0
+      $store.skip = -1
+      t.ok(notified, 'capping skip to 0 is notified')
+      t.eq($store.skip, 0, "skip can't be set less than 0")
+
+      cancel()
+    })
+
+    test('fields' + _debounce, withPouch, async (t, pouch) => {
+      const store = createSvouchStore(pouch, {
+        defaultAccessors: false,
         accessors: ['value', 'x'],
         debounce,
       })
@@ -211,7 +212,7 @@ for (const debounce of [false, 5]) {
         $store = x
       })
 
-      await $store.ready()
+      await $store.whenReady()
 
       t.eq(
         [...$store],
@@ -224,20 +225,20 @@ for (const debounce of [false, 5]) {
 
       $store.fields = ['x']
 
-      await $store.ready()
+      await $store.whenReady()
 
       t.eq([...$store], [{ x: 41 }, { x: 42 }, { x: 43 }])
 
       $store.fields = ['value']
 
-      await $store.ready()
+      await $store.whenReady()
 
       t.eq([...$store], [{ value: 'foo' }, { value: 'bar' }, { value: 'baz' }])
 
       cancel()
     })
 
-    test('selector', withPouch, async (t, pouch) => {
+    test('selector' + _debounce, withPouch, async (t, pouch) => {
       const store = createSvouchStore(pouch, {
         accessors: ['value'],
         debounce,
@@ -253,13 +254,13 @@ for (const debounce of [false, 5]) {
         $store = x
       })
 
-      await $store.ready()
+      await $store.whenReady()
 
       t.eq($store.map(getProp('value')), ['foo', 'bar', 'baz'])
 
       $store.selector = { value: { $regex: '^b' } }
 
-      await $store.ready()
+      await $store.whenReady()
 
       t.eq($store.map(getProp('value')), ['bar', 'baz'])
 
@@ -270,7 +271,7 @@ for (const debounce of [false, 5]) {
       $store.selector = {}
       $store.limit = 0
 
-      await $store.ready()
+      await $store.whenReady()
 
       t.eq($store.map(getProp('value')), ['foo', 'bar', 'baz'])
 
@@ -308,7 +309,7 @@ describe('sub stores', () => {
       }),
     ]
 
-    await $store.ready()
+    await $store.whenReady()
 
     t.notOk($dirty, 'is not initially dirty')
     t.notOk($busy, 'is not initially busy')
@@ -327,27 +328,34 @@ describe('sub stores', () => {
       $store = x
     })
 
-    await $store.ready()
+    await $store.whenReady()
 
     $store[0].value = 'foot'
 
     $store.commit()
 
+    t.ok($dirty, 'is dirty while a record is being saved')
     t.ok($busy, 'is busy while a record is being saved')
 
     cancel()
 
-    t.skip('TODO: needs idle')
+    cancel = store.subscribe((x) => {
+      $store = x
+    })
 
-    // cancel = store.subscribe((x) => {
-    //   $store = x
-    // })
-    //
-    // await $store.ready()
-    //
-    // t.eq($store.map(getProp('value')), ['foot', 'bar'])
-    //
-    // cancel()
+    await $store.whenReady()
+
+    t.eq($store.map(getProp('value')), ['foot', 'bar'])
+
+    $store.autoCommit = true
+
+    $store[0].value = 'foot'
+
+    cancel()
+
+    t.skip('TODO')
+    // t.ok($dirty, 'is dirty during auto commit')
+    // t.ok($busy, 'is busy during auto commit')
 
     disposers.forEach(callFn)
   })
